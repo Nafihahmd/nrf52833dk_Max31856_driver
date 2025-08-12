@@ -1,0 +1,11 @@
+&spi0 {
+    status = "okay"; /* Only needed if you want to enable it, and it's not enabled elsewhere */
+	cs-gpios = < &gpio0 2 GPIO_ACTIVE_LOW >;
+    max31855: max31855@0 {
+        compatible = "maxim,max31855";
+        reg = <0>;
+        spi-max-frequency = <1000000>;
+        label = "MAX31855";
+        // cs-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+    };
+};
