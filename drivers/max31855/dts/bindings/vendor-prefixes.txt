@@ -1,0 +1,12 @@
+# Device tree binding vendor prefix registry. Keep this list in
+# alphabetical order.
+#
+# Written to avoid warning due to prefix "custom"
+#
+# The contents of this file are parsed during documentation generation.
+# Anything that starts with a '#' is treated as a comment and ignored.
+# Non-empty lines should be in this format:
+#
+# <vendor-prefix><TAB><Full name of vendor>
+
+custom	Custom made in ecs

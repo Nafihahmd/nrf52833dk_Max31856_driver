@@ -1,0 +1,11 @@
+# MAX31855 custom driver options 
+
+# Copyright (c) 2019 Nordic Semiconductor
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig CUSTOM_MAX31855
+	bool "MAX31855 display driver"
+	default y
+	select SPI
+    help
+      Enable support for the custom MAX31855 driver.
