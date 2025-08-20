@@ -19,7 +19,7 @@ LOG_MODULE_REGISTER(max31855_example, LOG_LEVEL_INF);
 #define SLEEP_TIME_MS   1000
 
 /* assumes you named the DT node: max31855: in your overlay (node-label = max31855;) */
-#define MAX31855_NODE DT_NODELABEL(max31855)
+#define MAX31855_NODE DT_NODELABEL(max31856)
 static const struct device *max_dev = DEVICE_DT_GET(MAX31855_NODE);
 
 int main(void)
@@ -58,7 +58,7 @@ int main(void)
             LOG_ERR("sensor_channel_get AMBIENT failed: %d", err);
         } else {
             double amb = sensor_value_to_double(&ambient_val);
-            LOG_INF("Internal ambient: %.2f °C", amb);
+            LOG_INF("Cold junction: %.2f °C", amb);
         }
 
 		k_msleep(SLEEP_TIME_MS);
