@@ -1,12 +1,12 @@
 &spi0 {
     status = "okay"; /* Only needed if you want to enable it, and it's not enabled elsewhere */
 	cs-gpios = < &gpio0 2 GPIO_ACTIVE_LOW >;
-    max31855: max31855@0 {
-        compatible = "custom,max31855";
+    max31856: max31856@0 {
+        compatible = "custom,max31856";
         reg = <0>;
         spi-max-frequency = <1000000>;
-        // thermocouple-type = <THERMOCOUPLE_TYPE_K>;
-        // averaging = <3>; /* 8 samples */
-        // filter-50hz;
+        thermocouple-type = <3>; /* Type K */
+        averaging = <3>; /* 8 samples */
+        filter-50hz;
     };
 };

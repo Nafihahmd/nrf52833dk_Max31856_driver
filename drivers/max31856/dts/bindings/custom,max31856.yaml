@@ -1,0 +1,40 @@
+# Copyright (c) 2020, Marco Peter
+# SPDX-License-Identifier: Apache-2.0
+
+description: max31856 SPI-based cold-junction compensated thermocouple-to-digital converter.
+
+compatible: "custom,max31856"
+
+include: [sensor-device.yaml, spi-device.yaml]
+properties:
+  thermocouple-type:
+    type: int
+    required: true
+    description: |
+      Thermocouple type (0=B, 1=E, 2=J, 3=K, 4=N, 5=R, 6=S, 7=T)
+      
+  averaging:
+    type: int
+    required: false
+    default: 0
+    description: |
+      Averaging setting (0=1x, 1=2x, 2=4x, 3=8x, 4=16x)
+      
+  filter-50hz:
+    type: boolean
+    required: false
+    description: |
+      Enable 50Hz noise rejection (default 60Hz)
+
+  use-external-cj:
+    type: boolean
+    required: false
+    description: |
+      Use external cold-junction sensor
+      
+  operating-mode:
+    type: int
+    required: false
+    default: 0
+    description: |
+      Operation mode (0=auto, 1=one-shot)
