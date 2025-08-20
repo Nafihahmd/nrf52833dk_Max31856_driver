@@ -8,5 +8,6 @@
         thermocouple-type = <3>; /* Type K */
         averaging = <3>; /* 8 samples */
         filter-50hz;
+        operating-mode = <0>; /* Auto mode */
     };
 };
