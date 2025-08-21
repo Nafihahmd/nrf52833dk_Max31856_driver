@@ -22,13 +22,13 @@ struct max31856_config {
     bool filter_50hz;
     bool use_external_cj;
     uint8_t operating_mode;
+    bool fault_mask;
 };
 
 struct max31856_data {
     int32_t thermocouple_temp;
     int32_t cold_junction_temp;
-    uint8_t fault;    
-    bool filter_50hz;
+    uint8_t fault;
 };
 
 
@@ -190,6 +190,16 @@ static int max31856_init(const struct device *dev)
     if (ret) {
         LOG_ERR("Failed to write CR1");
         return ret;
+    }
+
+    /* Config Fault Mask Regitser */
+    if (config->fault_mask) {
+        uint8_t mask = 0x00;
+        ret = max31856_write_reg(dev, MAX31856_MASK_REG, mask);
+        if (ret) {
+            LOG_ERR("Failed to write MASK register");
+            return ret;
+        }
     }
 
     return 0;
@@ -564,6 +574,7 @@ static const struct sensor_driver_api max31856_api = {
         .filter_50hz = DT_INST_PROP(n, filter_50hz), \
         .use_external_cj = DT_INST_PROP(n, use_external_cj), \
         .operating_mode = DT_INST_PROP(n, operating_mode), \
+        .fault_mask = DT_INST_PROP(n, fault_mask), \
     }; \
     SENSOR_DEVICE_DT_INST_DEFINE(n, \
                   max31856_init, \

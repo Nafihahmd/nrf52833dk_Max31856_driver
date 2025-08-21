@@ -38,3 +38,9 @@ properties:
     default: 0
     description: |
       Operation mode (0=auto, 1=one-shot)
+
+  fault-mask:
+    type: boolean
+    required: false
+    description: |
+      Enable FAULT pin assertion (default false)
