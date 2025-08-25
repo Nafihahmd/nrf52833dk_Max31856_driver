@@ -15,6 +15,22 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(customMAX31856, CONFIG_SENSOR_LOG_LEVEL);
 
+/* Custom sensor attributes for fault detection */
+enum max31856_attribute {
+    // MAX31856_ATTR_FAULT_OVUV = SENSOR_ATTR_PRIV_START,
+    // MAX31856_ATTR_FAULT_OC,
+    // MAX31856_ATTR_FAULT_TCRANGE,
+    // MAX31856_ATTR_FAULT_CJRANGE,
+    MAX31856_ATTR_FILTER_FREQ = SENSOR_ATTR_PRIV_START,
+    MAX31856_ATTR_CJ_LOWER_THRESH,
+    MAX31856_ATTR_CJ_UPPER_THRESH,
+    MAX31856_ATTR_TC_LOWER_THRESH,
+    MAX31856_ATTR_TC_UPPER_THRESH,
+    MAX31856_ATTR_CJ_TEMP,
+    MAX31856_ATTR_CJ_OFFSET,
+    MAX31856_ATTR_FAULT_TYPE,
+};
+
 struct max31856_config {
     struct spi_dt_spec spi;
     uint8_t thermocouple_type;
@@ -297,21 +313,6 @@ static int max31856_channel_get(const struct device *dev,
     return 0;
 }
 
-/* Custom sensor attributes for fault detection */
-enum max31856_attribute {
-    // MAX31856_ATTR_FAULT_OVUV = SENSOR_ATTR_PRIV_START,
-    // MAX31856_ATTR_FAULT_OC,
-    // MAX31856_ATTR_FAULT_TCRANGE,
-    // MAX31856_ATTR_FAULT_CJRANGE,
-    MAX31856_ATTR_FILTER_FREQ = SENSOR_ATTR_PRIV_START,
-    MAX31856_ATTR_CJ_LOWER_THRESH,
-    MAX31856_ATTR_CJ_UPPER_THRESH,
-    MAX31856_ATTR_TC_LOWER_THRESH,
-    MAX31856_ATTR_TC_UPPER_THRESH,
-    MAX31856_ATTR_CJ_OFFSET,
-    MAX31856_ATTR_FAULT_TYPE,
-};
-
 /* Helper function to check a specific fault */
 static int max31856_check_fault(const struct device *dev, uint8_t fault_bit, 
                                struct sensor_value *val)
@@ -409,6 +410,42 @@ static int max31856_write_tc_threshold(const struct device *dev, uint8_t reg_msb
     return max31856_write_reg(dev, reg_msb + 2, reg_value & 0xFF);
 }
 
+/* Function to set cold junction temperature */
+static int max31856_write_cold_junction_temp(const struct device *dev, float temperature)
+{
+    uint8_t buf[2];
+    int16_t reg_value;
+    int ret;
+    
+    /* Convert temperature to register units (0.015625°C per LSB) */
+    reg_value = (int16_t)(temperature / 0.015625);
+    
+    /* Prepare register values according to the specified format */
+    /* CJTH: Sign bit + 7 bits of integer part */
+    buf[0] = (reg_value >> 6) & 0xFF;
+    
+    /* CJTL: 6 bits of fractional part (2^-1 to 2^-6) in bits 7-2, bits 1-0 are 0 */
+    /* The fractional part is bits 5-0 of the 14-bit value, shifted left by 2 */
+    buf[1] = (reg_value & 0x3F) << 2;
+    
+    /* Write to cold junction temperature registers */
+    ret = max31856_write_reg(dev, MAX31856_CJTH_REG, buf[0]);
+    if (ret) {
+        LOG_ERR("Failed to write CJTH register");
+        return ret;
+    }
+    
+    ret = max31856_write_reg(dev, MAX31856_CJTL_REG, buf[1]);
+    if (ret) {
+        LOG_ERR("Failed to write CJTL register");
+        return ret;
+    }
+    
+    LOG_DBG("Set cold junction temperature: %.2f°C (CJTH: 0x%02x, CJTL: 0x%02x)",
+            temperature, buf[0], buf[1]);
+    
+    return 0;
+}
 
 static int max31856_attr_set(const struct device *dev,
                             enum sensor_channel chan,
@@ -455,6 +492,35 @@ static int max31856_attr_set(const struct device *dev,
         microtemp = (int64_t)val->val1 * 1000000 + val->val2;
         offset_value = microtemp / INTERNAL_RESOLUTION;
         ret = max31856_write_reg(dev, MAX31856_CJTO_REG, (uint8_t)offset_value);
+        break;        
+        
+    case MAX31856_ATTR_CJ_TEMP:
+        /* Set cold junction temperature */
+        float temperature;        
+        uint8_t buf[2];
+        /* Ensure we are in the correct mode */
+       ret = max31856_read_reg(dev, MAX31856_CR0_REG, &buf[0]);
+       ret |= max31856_write_reg(dev, MAX31856_CR0_REG, buf[0] | MAX31856_CR0_CJ); /* Enable cold junction mode */
+       if (ret) {
+            LOG_ERR("Failed to enable cold junction mode");
+            return ret;
+       }
+        
+        /* Convert sensor_value to float temperature */
+        microtemp = (int64_t)val->val1 * 1000000 + val->val2;
+        temperature = (float)microtemp / 1000000.0f;
+        
+        /* Write to cold junction temperature registers */
+        ret = max31856_write_cold_junction_temp(dev, temperature);
+        if (ret) {
+            LOG_ERR("Failed to write cold junction temperature");
+            return ret;
+        }
+        // buf[0] = (cj_value >> 8) & 0xFF;
+        // buf[1] = cj_value & 0xFF; 
+        // /* Write cold junction temperature */
+        // ret = max31856_write_reg(dev, MAX31856_CJTH_REG, &buf[0]);
+        // ret |= max31856_write_reg(dev, MAX31856_CJTL_REG, &buf[1]);
         break;
         
     case MAX31856_ATTR_FAULT_TYPE:

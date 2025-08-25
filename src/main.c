@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(max31855_example, LOG_LEVEL_INF);
 /* assumes you named the DT node: max31855: in your overlay (node-label = max31855;) */
 #define MAX31855_NODE DT_NODELABEL(max31856)
 static const struct device *max_dev = DEVICE_DT_GET(MAX31855_NODE);
+static const struct device *external_cj = DEVICE_DT_GET(DT_NODELABEL(temp));
 
 /* Custom sensor attributes for fault detection */
 enum max31856_attribute {
@@ -33,6 +34,7 @@ enum max31856_attribute {
     MAX31856_ATTR_CJ_UPPER_THRESH,
     MAX31856_ATTR_TC_LOWER_THRESH,
     MAX31856_ATTR_TC_UPPER_THRESH,
+    MAX31856_ATTR_CJ_TEMP,
     MAX31856_ATTR_CJ_OFFSET,
     MAX31856_ATTR_FAULT_TYPE,
 };
@@ -47,6 +49,8 @@ int main(void)
     struct sensor_value threshold;
     /* Fault status */
     struct sensor_value fault_status;
+    /* External CJ value */
+    struct sensor_value external_cj_val;
 
     if (!device_is_ready(max_dev)) {
         LOG_ERR("MAX31855 device not ready");
@@ -67,6 +71,23 @@ int main(void)
             continue;
         }
 
+        err = sensor_sample_fetch(external_cj);
+        if (err) {
+            LOG_ERR("sensor_sample_fetch_chan failed: %d", err);
+        } else {
+            /* Read external cold junction temperature */
+            sensor_channel_get(external_cj, SENSOR_CHAN_DIE_TEMP, &external_cj_val);
+            double ext_temp = sensor_value_to_double(&external_cj_val);
+            LOG_INF("*External Cold Junction: %.2f °C", ext_temp);
+        }
+
+        /* Set external cold junction temperature */
+        err = sensor_attr_set(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_CJ_TEMP, &external_cj_val);
+        if (err) {
+            LOG_ERR("sensor_attr_set CJ_TEMP failed: %d", err);
+        } 
+
+        /* Read thermocouple and cold junction temperatures */
         err = sensor_channel_get(max_dev, SENSOR_CHAN_DIE_TEMP, &tc_val);
         if (err) {
             LOG_ERR("sensor_channel_get TEMP failed: %d", err);

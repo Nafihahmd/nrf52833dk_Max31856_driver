@@ -29,6 +29,7 @@
 #define MAX31856_CR0_OCFAULT       BIT(4)
 #define MAX31856_CR0_OCFAULT_MASK  (BIT(4) | BIT(5))
 #define MAX31856_CR0_FILTER_50HZ   BIT(0)
+#define MAX31856_CR0_CJ            BIT(3)
 
 /* CR1 Register Bits */
 #define MAX31856_AVERAGING_MASK    (BIT(4) | BIT(5) | BIT(6))

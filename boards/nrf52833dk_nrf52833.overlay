@@ -1,3 +1,10 @@
+
+/ {
+        aliases {
+                die-temp0 = &temp;
+        };
+};
+
 &spi0 {
     status = "okay"; /* Only needed if you want to enable it, and it's not enabled elsewhere */
 	cs-gpios = < &gpio0 2 GPIO_ACTIVE_LOW >;
