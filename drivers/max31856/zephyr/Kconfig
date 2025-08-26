@@ -9,3 +9,8 @@ menuconfig CUSTOM_MAX31856
 	select SPI
     help
       Enable support for the custom MAX31856 driver.
+config MAX31856_FAULT_TRIGGER
+    bool "Enable fault trigger support for MAX31856"
+    depends on CUSTOM_MAX31855
+    help
+      Enable fault trigger support for MAX31856 data ready and fault detection.

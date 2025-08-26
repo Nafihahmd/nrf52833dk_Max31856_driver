@@ -7,29 +7,15 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/types.h>
 #include <zephyr/device.h>
 #include "max31856_regs.h"
+#include "max31856.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(customMAX31856, CONFIG_SENSOR_LOG_LEVEL);
-
-/* Custom sensor attributes for fault detection */
-enum max31856_attribute {
-    // MAX31856_ATTR_FAULT_OVUV = SENSOR_ATTR_PRIV_START,
-    // MAX31856_ATTR_FAULT_OC,
-    // MAX31856_ATTR_FAULT_TCRANGE,
-    // MAX31856_ATTR_FAULT_CJRANGE,
-    MAX31856_ATTR_FILTER_FREQ = SENSOR_ATTR_PRIV_START,
-    MAX31856_ATTR_CJ_LOWER_THRESH,
-    MAX31856_ATTR_CJ_UPPER_THRESH,
-    MAX31856_ATTR_TC_LOWER_THRESH,
-    MAX31856_ATTR_TC_UPPER_THRESH,
-    MAX31856_ATTR_CJ_TEMP,
-    MAX31856_ATTR_CJ_OFFSET,
-    MAX31856_ATTR_FAULT_TYPE,
-};
 
 struct max31856_config {
     struct spi_dt_spec spi;
@@ -39,14 +25,24 @@ struct max31856_config {
     bool use_external_cj;
     uint8_t operating_mode;
     bool fault_mask;
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
+    struct gpio_dt_spec fault_gpio;
+    struct gpio_dt_spec drdy_gpio;
+#endif
 };
 
 struct max31856_data {
     int32_t thermocouple_temp;
     int32_t cold_junction_temp;
     uint8_t fault;
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
+    struct gpio_callback fault_cb;
+    struct k_work fault_work;
+    const struct sensor_trigger *fault_trigger;
+    sensor_trigger_handler_t fault_handler;
+    const struct device *dev;
+#endif
 };
-
 
 /* Fixed SPI write function with proper timing */
 static int max31856_write_reg(const struct device *dev, uint8_t reg, uint8_t val)
@@ -152,6 +148,99 @@ static int max31856_read_regs(const struct device *dev, uint8_t start_reg, uint8
     return ret;
 }
 
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
+/* Fault work handler */
+static void max31856_fault_work_handler(struct k_work *work)
+{
+    struct max31856_data *data = CONTAINER_OF(work, struct max31856_data, fault_work);
+    
+    if (data->fault_handler && data->fault_trigger) {
+        data->fault_handler(data->dev, data->fault_trigger);
+    }
+}
+
+/* Fault GPIO interrupt handler */
+static void max31856_fault_handler(const struct device *gpio_dev, 
+                                  struct gpio_callback *cb, uint32_t pins)
+{
+    struct max31856_data *data = CONTAINER_OF(cb, struct max31856_data, fault_cb);
+    
+    k_work_submit(&data->fault_work);
+}
+
+static int max31856_trigger_set(const struct device *dev,
+                               const struct sensor_trigger *trig,
+                               sensor_trigger_handler_t handler)
+{
+    struct max31856_data *data = dev->data;
+    const struct max31856_config *config = dev->config;
+    int ret = 0;
+    LOG_INF("Setting trigger type %d (%d)\n", trig->type, MAX31856_TRIGGER_FAULT);
+    if (trig->type == MAX31856_TRIGGER_FAULT) {
+        data->fault_trigger = trig;
+        data->fault_handler = handler;
+        
+        if (config->fault_gpio.port) {
+            LOG_INF("Configuring fault GPIO interrupt\n");
+            ret = gpio_pin_interrupt_configure_dt(&config->fault_gpio, 
+                                                 GPIO_INT_EDGE_TO_ACTIVE);
+        }
+    }
+    
+    /* To-do: Implement data ready trigger if needed
+    else if (trig->type == SENSOR_TRIG_DATA_READY) {
+        data->drdy_trigger = trig;
+        data->drdy_handler = handler;
+        
+        if (config->drdy_gpio.port) {
+            ret = gpio_pin_interrupt_configure_dt(&config->drdy_gpio, 
+                                                 GPIO_INT_EDGE_TO_ACTIVE);
+        }
+    }*/ 
+    else  {
+        return -ENOTSUP;
+    }
+    
+    return ret;
+}
+/* Initialize trigger support */
+static int max31856_init_trigger(const struct device *dev)
+{
+    struct max31856_data *data = dev->data;
+    const struct max31856_config *config = dev->config;
+    int ret;
+    
+    data->dev = dev;
+    LOG_INF("Initializing trigger support\n");
+        
+      /* Initialize fault GPIO */
+    if (config->fault_gpio.port) {
+        if (!gpio_is_ready_dt(&config->fault_gpio)) {
+            LOG_ERR("Fault GPIO device is not ready");
+            return -ENODEV;
+        }
+        
+        ret = gpio_pin_configure_dt(&config->fault_gpio, GPIO_INPUT);
+        if (ret) {
+            LOG_ERR("Failed to configure fault GPIO");
+            return ret;
+        }
+        
+        gpio_init_callback(&data->fault_cb, max31856_fault_handler, 
+                          BIT(config->fault_gpio.pin));
+        
+        ret = gpio_add_callback(config->fault_gpio.port, &data->fault_cb);
+        if (ret) {
+            LOG_ERR("Failed to add fault callback");
+            return ret;
+        }
+        
+        k_work_init(&data->fault_work, max31856_fault_work_handler);
+    }
+    
+    return 0;
+}
+#endif /* CONFIG_MAX31856_FAULT_TRIGGER */
 static int max31856_init(const struct device *dev)
 {
     const struct max31856_config *config = dev->config;
@@ -215,7 +304,15 @@ static int max31856_init(const struct device *dev)
         if (ret) {
             LOG_ERR("Failed to write MASK register");
             return ret;
+        }            
+        #ifdef CONFIG_MAX31856_FAULT_TRIGGER
+        /* Initialize trigger support */
+        ret = max31856_init_trigger(dev);
+        if (ret) {
+            LOG_ERR("Failed to initialize triggers");
+            return ret;
         }
+        #endif
     }
 
     return 0;
@@ -615,21 +712,22 @@ static int max31856_attr_get(const struct device *dev,
 
 }
 
-static int max31856_trigger_set(const struct device *dev,
-                               const struct sensor_trigger *trig,
-                               sensor_trigger_handler_t handler)
-{
-    /* MAX31856 does not support triggers */
-    return -ENOTSUP;
-}
+
 static const struct sensor_driver_api max31856_api = {
     .sample_fetch = max31856_sample_fetch,
     .channel_get = max31856_channel_get,
     .attr_set = max31856_attr_set,
     .attr_get = max31856_attr_get,
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
     .trigger_set = max31856_trigger_set,
+#endif
 };
-
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
+#define MAX31856_FAULT_GPIO_INIT(n) \
+    .fault_gpio = GPIO_DT_SPEC_INST_GET_OR(n, fault_gpios, {0}),
+#else
+#define MAX31856_FAULT_GPIO_INIT(n)
+#endif
 #define MAX31856_INIT(n) \
     static struct max31856_data max31856_data_##n; \
     static const struct max31856_config max31856_config_##n = { \
@@ -637,6 +735,7 @@ static const struct sensor_driver_api max31856_api = {
                     SPI_OP_MODE_MASTER | SPI_MODE_CPHA | SPI_WORD_SET(8), 0), \
         .thermocouple_type = DT_INST_PROP(n, thermocouple_type), \
         .averaging = DT_INST_PROP(n, averaging), \
+         MAX31856_FAULT_GPIO_INIT(n) \
         .filter_50hz = DT_INST_PROP(n, filter_50hz), \
         .use_external_cj = DT_INST_PROP(n, use_external_cj), \
         .operating_mode = DT_INST_PROP(n, operating_mode), \

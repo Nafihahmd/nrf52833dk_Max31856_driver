@@ -44,3 +44,17 @@ properties:
     required: false
     description: |
       Enable FAULT pin assertion (default false)
+
+  drdy-gpios:
+    type: phandle-array
+    required: false
+    description: |
+      Data Ready GPIO specification. This pin goes active when new
+      conversion data is available. Typically active low.
+  
+  fault-gpios:
+    type: phandle-array
+    required: false
+    description: |
+      Fault GPIO specification. This pin goes active when a fault
+      condition is detected. Typically active low.

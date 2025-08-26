@@ -36,9 +36,6 @@
 #define MAX31856_AVERAGING_SHIFT   4
 #define MAX31856_TC_TYPE_MASK      (BIT(0) | BIT(1) | BIT(2) | BIT(3))
 
-/* SR Register Bits */
-#define MAX31856_FAULT_OVUV        BIT(1)
-#define MAX31856_FAULT_OPEN        BIT(0)
 
 /* Thermocouple Types */
 #define THERMOCOUPLE_TYPE_B        0
