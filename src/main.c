@@ -83,16 +83,10 @@ static void drdy_trigger_handler(const struct device *dev,
 int main(void)
 {	
     int err;
-	/* thermocouple temp (thermocouple channel) */
-	struct sensor_value tc_val;
-	/* internal / ambient temp (chip die temperature) */
-	struct sensor_value ambient_val;
-    /* Sensor threshold value */
-    struct sensor_value threshold;
-    /* Fault status */
-    struct sensor_value fault_status;
     /* External CJ value */
     // struct sensor_value external_cj_val;
+    /* Sensor threshold value */
+    struct sensor_value threshold;
     if (!device_is_ready(max_dev)) {
         LOG_ERR("MAX31855 device not ready");
         return -1;
@@ -106,6 +100,13 @@ int main(void)
     };
     /* Set up data ready trigger */
     sensor_trigger_set(max_dev, &drdy_trigger_cfg, drdy_trigger_handler);
+#else
+	/* thermocouple temp (thermocouple channel) */
+	struct sensor_value tc_val;
+	/* internal / ambient temp (chip die temperature) */
+	struct sensor_value ambient_val;
+    /* Fault status */
+    struct sensor_value fault_status;
 #endif
 #ifdef CONFIG_MAX31856_FAULT_TRIGGER
     /* sensor trigger*/
@@ -146,27 +147,27 @@ int main(void)
         // if (err) {
         //     LOG_ERR("sensor_attr_set CJ_TEMP failed: %d", err);
         // } 
-
+#ifndef CONFIG_MAX31856_DRDY_TRIGGER
         /* Read thermocouple and cold junction temperatures */
-        // err = sensor_channel_get(max_dev, SENSOR_CHAN_DIE_TEMP, &tc_val);
-        // if (err) {
-        //     LOG_ERR("sensor_channel_get TEMP failed: %d", err);
-        // } else {
-        //     double tc = sensor_value_to_double(&tc_val);
-        //     LOG_INF("Thermocouple: %.2f °C", tc);
-        // }
+        err = sensor_channel_get(max_dev, SENSOR_CHAN_DIE_TEMP, &tc_val);
+        if (err) {
+            LOG_ERR("sensor_channel_get TEMP failed: %d", err);
+        } else {
+            double tc = sensor_value_to_double(&tc_val);
+            LOG_INF("Thermocouple: %.2f °C", tc);
+        }
 
-        // err = sensor_channel_get(max_dev, SENSOR_CHAN_AMBIENT_TEMP, &ambient_val);
-        // if (err) {
-        //     LOG_ERR("sensor_channel_get AMBIENT failed: %d", err);
-        // } else {
-        //     double amb = sensor_value_to_double(&ambient_val);
-        //     LOG_INF("Cold junction: %.2f °C", amb);
-        // }
-
+        err = sensor_channel_get(max_dev, SENSOR_CHAN_AMBIENT_TEMP, &ambient_val);
+        if (err) {
+            LOG_ERR("sensor_channel_get AMBIENT failed: %d", err);
+        } else {
+            double amb = sensor_value_to_double(&ambient_val);
+            LOG_INF("Cold junction: %.2f °C", amb);
+        }
         /* Read fault status register */
-        // sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_FAULT_TYPE, &fault_status);
-        // LOG_INF("Fault status: 0x%02x", fault_status.val1);
+        sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_FAULT_TYPE, &fault_status);
+        LOG_INF("Fault status: 0x%02x", fault_status.val1);
+#endif
 
 		k_msleep(SLEEP_TIME_MS);
 	}

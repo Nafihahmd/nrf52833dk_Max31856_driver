@@ -16,11 +16,12 @@ enum max31856_attribute {
 };
 
 /* Custom trigger types */
+#if (defined(CONFIG_MAX31856_FAULT_TRIGGER) || defined(CONFIG_MAX31856_DRDY_TRIGGER))
 enum max31856_trigger_type {
     MAX31856_TRIGGER_DATA_READY = SENSOR_TRIG_PRIV_START,
     MAX31856_TRIGGER_FAULT,
 };
-
+#endif
 
 /* Fault Status Register (SR)x Register Bits */
 #define MAX31856_FAULT_OPEN        BIT(0)

@@ -157,6 +157,7 @@ static int max31856_read_regs(const struct device *dev, uint8_t start_reg, uint8
 }
 
 #if (defined(CONFIG_MAX31856_FAULT_TRIGGER) || defined(CONFIG_MAX31856_DRDY_TRIGGER))
+#ifdef CONFIG_MAX31856_DRDY_TRIGGER
 /* Data ready work handler */
 static void max31856_drdy_work_handler(struct k_work *work)
 {
@@ -174,8 +175,10 @@ static void max31856_drdy_handler(const struct device *gpio_dev,
     
     k_work_submit(&data->drdy_work);
 }
+#endif /* CONFIG_MAX31856_DRDY_TRIGGER */
 
 /* Fault work handler */
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
 static void max31856_fault_work_handler(struct k_work *work)
 {
     struct max31856_data *data = CONTAINER_OF(work, struct max31856_data, fault_work);
@@ -193,6 +196,7 @@ static void max31856_fault_handler(const struct device *gpio_dev,
     
     k_work_submit(&data->fault_work);
 }
+#endif /* CONFIG_MAX31856_FAULT_TRIGGER */
 
 static int max31856_trigger_set(const struct device *dev,
                                const struct sensor_trigger *trig,
@@ -201,6 +205,7 @@ static int max31856_trigger_set(const struct device *dev,
     struct max31856_data *data = dev->data;
     const struct max31856_config *config = dev->config;
     int ret = 0;
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
     if (trig->type == MAX31856_TRIGGER_FAULT) {
     // LOG_INF("Setting trigger type %d \n", trig->type);
         data->fault_trigger = trig;
@@ -211,7 +216,9 @@ static int max31856_trigger_set(const struct device *dev,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
         }
     }
-    else if (trig->type == MAX31856_TRIGGER_DATA_READY) {
+#endif
+#ifdef CONFIG_MAX31856_DRDY_TRIGGER
+     if (trig->type == MAX31856_TRIGGER_DATA_READY) {
     // LOG_INF("Setting trigger type %d \n", trig->type);
         data->drdy_trigger = trig;
         data->drdy_handler = handler;
@@ -221,6 +228,7 @@ static int max31856_trigger_set(const struct device *dev,
                                                  GPIO_INT_EDGE_TO_ACTIVE);
         }
     }
+#endif
     else  {
         return -ENOTSUP;
     }
@@ -237,6 +245,7 @@ static int max31856_init_trigger(const struct device *dev)
     data->dev = dev;
         
     /* Initialize data ready GPIO */
+#ifdef CONFIG_MAX31856_DRDY_TRIGGER
     if (config->drdy_gpio.port) {
         if (!gpio_is_ready_dt(&config->drdy_gpio)) {
             LOG_ERR("DRDY GPIO device is not ready");
@@ -260,8 +269,9 @@ static int max31856_init_trigger(const struct device *dev)
         
         k_work_init(&data->drdy_work, max31856_drdy_work_handler);
     }
-
+#endif /* CONFIG_MAX31856_DRDY_TRIGGER */
     /* Initialize fault GPIO */
+#ifdef CONFIG_MAX31856_FAULT_TRIGGER
     if (config->fault_gpio.port /*&& config->fault_mask*/) {
         if (!gpio_is_ready_dt(&config->fault_gpio)) {
             LOG_ERR("Fault GPIO device is not ready");
@@ -285,7 +295,7 @@ static int max31856_init_trigger(const struct device *dev)
         
         k_work_init(&data->fault_work, max31856_fault_work_handler);
     }
-    
+#endif /* CONFIG_MAX31856_FAULT_TRIGGER */ 
     return 0;
 }
 #endif /* CONFIG_MAX31856_FAULT_TRIGGER */
@@ -434,6 +444,7 @@ static int max31856_channel_get(const struct device *dev,
     
     /* Check for faults */
     if (data->fault & (MAX31856_FAULT_OVUV | MAX31856_FAULT_OPEN)) {
+        LOG_DBG("Fault detected: 0x%02x", data->fault);
         LOG_ERR("%s fault detected", (data->fault & MAX31856_FAULT_OVUV) ? "Over/Under Voltage" : "Open Circuit");
         return -EIO;
     }
@@ -769,8 +780,10 @@ static const struct sensor_driver_api max31856_api = {
     .channel_get = max31856_channel_get,
     .attr_set = max31856_attr_set,
     .attr_get = max31856_attr_get,
-#ifdef CONFIG_MAX31856_FAULT_TRIGGER
+#if (defined(CONFIG_MAX31856_FAULT_TRIGGER) || defined(CONFIG_MAX31856_DRDY_TRIGGER))
     .trigger_set = max31856_trigger_set,
+#else
+    .trigger_set = NULL,
 #endif
 };
 
