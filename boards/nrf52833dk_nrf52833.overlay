@@ -14,9 +14,10 @@
         spi-max-frequency = <1000000>;
         thermocouple-type = <3>; /* Type K */
         averaging = <3>; /* 8 samples */
-        fault-gpios = < &gpio1 2 GPIO_ACTIVE_LOW >;  /* Fault GPIO */
+        fault-gpios = < &gpio1 1 GPIO_ACTIVE_LOW >;  /* Fault GPIO */
+        drdy-gpios = < &gpio1 2 GPIO_ACTIVE_LOW >;   /* Data Ready GPIO */
         filter-50hz;
-        operating-mode = <0>; /* Auto mode */
+        operating-mode = <1>; /* 0 = Auto mode, 1 = 1 shot mode */
         fault-mask; /* Enable FAULT pin assertion */        
     };
 };

@@ -14,7 +14,7 @@
 #include "max31856.h"
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(max31855_example, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(max31856_app, LOG_LEVEL_INF);
 
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   1000
@@ -34,35 +34,52 @@ static void fault_trigger_handler(const struct device *dev,
     /* Read the fault status */
     sensor_attr_get(dev, SENSOR_CHAN_ALL, MAX31856_ATTR_FAULT_TYPE, &fault_status);
     
-    printk("Fault detected: 0x%02x\n", fault_status.val1);
+    LOG_DBG("Fault detected: 0x%02x\n", fault_status.val1);
     
     /* Check specific fault bits */
     if (fault_status.val1 & MAX31856_FAULT_OPEN) {
-        printk("  - Open circuit fault\n");
+        LOG_ERR("  - Open circuit fault\n");
     }
     if (fault_status.val1 & MAX31856_FAULT_OVUV) {
-        printk("  - Overvoltage/undervoltage fault\n");
+        LOG_ERR("  - Overvoltage/undervoltage fault\n");
     }
     if( fault_status.val1 & MAX31856_FAULT_TCLOW) {
-        printk("  - Thermocouple low threshold fault\n");
+        LOG_ERR("  - Thermocouple low threshold fault\n");
     }
     if (fault_status.val1 & MAX31856_FAULT_TCHIGH) {
-        printk("  - Thermocouple high threshold fault\n");
+        LOG_ERR("  - Thermocouple high threshold fault\n");
     }
     if (fault_status.val1 & MAX31856_FAULT_CJLOW) {
-        printk("  - Cold junction low threshold fault\n");
+        LOG_ERR("  - Cold junction low threshold fault\n");
     }
     if (fault_status.val1 & MAX31856_FAULT_CJHIGH) {
-        printk("  - Cold junction high threshold fault\n");
+        LOG_ERR("  - Cold junction high threshold fault\n");
     }
     if (fault_status.val1 & MAX31856_FAULT_TCRANGE) {
-        printk("  - Thermocouple out of range\n");
+        LOG_ERR("  - Thermocouple out of range\n");
     }
     if (fault_status.val1 & MAX31856_FAULT_CJRANGE) {
-        printk("  - Cold junction out of range\n");
+        LOG_ERR("  - Cold junction out of range\n");
     }
 }
 #endif
+#ifdef CONFIG_MAX31856_DRDY_TRIGGER
+/* Data ready trigger handler */
+static void drdy_trigger_handler(const struct device *dev,
+                                const struct sensor_trigger *trig)
+{
+    struct sensor_value thermocouple, cold_junction;
+    
+    /* Read the temperature values */
+    sensor_channel_get(dev, SENSOR_CHAN_DIE_TEMP, &thermocouple);
+    sensor_channel_get(dev, SENSOR_CHAN_AMBIENT_TEMP, &cold_junction);
+    
+    LOG_INF("Data ready: Thermocouple: %d.%06d°C, Cold Junction: %d.%06d°C\n",
+           thermocouple.val1, thermocouple.val2,
+           cold_junction.val1, cold_junction.val2);
+}
+#endif
+
 int main(void)
 {	
     int err;
@@ -78,13 +95,18 @@ int main(void)
     // struct sensor_value external_cj_val;
     if (!device_is_ready(max_dev)) {
         LOG_ERR("MAX31855 device not ready");
-        return;
+        return -1;
     }
-    
-    threshold.val1 = 30; // Set threshold to 100 degrees Celsius
-    threshold.val2 = 0;   // No fractional part
-    sensor_attr_set(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_TC_UPPER_THRESH, &threshold);
-    
+        
+#ifdef CONFIG_MAX31856_DRDY_TRIGGER
+    /* Configure drdy trigger */
+    struct sensor_trigger drdy_trigger_cfg = {
+        .type = MAX31856_TRIGGER_DATA_READY,
+        .chan = SENSOR_CHAN_ALL,
+    };
+    /* Set up data ready trigger */
+    sensor_trigger_set(max_dev, &drdy_trigger_cfg, drdy_trigger_handler);
+#endif
 #ifdef CONFIG_MAX31856_FAULT_TRIGGER
     /* sensor trigger*/
     struct sensor_trigger fault_trigger = {
@@ -94,6 +116,11 @@ int main(void)
      /* Set up fault trigger */
     sensor_trigger_set(max_dev, &fault_trigger, fault_trigger_handler);
 #endif
+
+    k_msleep(100); /* Wait for sensor to stabilize */
+    threshold.val1 = 30; // Set threshold to 100 degrees Celsius
+    threshold.val2 = 0;   // No fractional part
+    sensor_attr_set(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_TC_UPPER_THRESH, &threshold);
 	while (1) {
 		
         /* ask driver to read from the hardware and store latest sample */
@@ -121,25 +148,25 @@ int main(void)
         // } 
 
         /* Read thermocouple and cold junction temperatures */
-        err = sensor_channel_get(max_dev, SENSOR_CHAN_DIE_TEMP, &tc_val);
-        if (err) {
-            LOG_ERR("sensor_channel_get TEMP failed: %d", err);
-        } else {
-            double tc = sensor_value_to_double(&tc_val);
-            LOG_INF("Thermocouple: %.2f °C", tc);
-        }
+        // err = sensor_channel_get(max_dev, SENSOR_CHAN_DIE_TEMP, &tc_val);
+        // if (err) {
+        //     LOG_ERR("sensor_channel_get TEMP failed: %d", err);
+        // } else {
+        //     double tc = sensor_value_to_double(&tc_val);
+        //     LOG_INF("Thermocouple: %.2f °C", tc);
+        // }
 
-        err = sensor_channel_get(max_dev, SENSOR_CHAN_AMBIENT_TEMP, &ambient_val);
-        if (err) {
-            LOG_ERR("sensor_channel_get AMBIENT failed: %d", err);
-        } else {
-            double amb = sensor_value_to_double(&ambient_val);
-            LOG_INF("Cold junction: %.2f °C", amb);
-        }
+        // err = sensor_channel_get(max_dev, SENSOR_CHAN_AMBIENT_TEMP, &ambient_val);
+        // if (err) {
+        //     LOG_ERR("sensor_channel_get AMBIENT failed: %d", err);
+        // } else {
+        //     double amb = sensor_value_to_double(&ambient_val);
+        //     LOG_INF("Cold junction: %.2f °C", amb);
+        // }
 
         /* Read fault status register */
-        sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_FAULT_TYPE, &fault_status);
-        LOG_INF("Fault status: 0x%02x", fault_status.val1);
+        // sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_FAULT_TYPE, &fault_status);
+        // LOG_INF("Fault status: 0x%02x", fault_status.val1);
 
 		k_msleep(SLEEP_TIME_MS);
 	}
