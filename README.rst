@@ -1,5 +1,5 @@
-# MAX31856 Thermocouple-to-Digital Converter Driver Guide
-==========================================================
+MAX31856 Thermocouple-to-Digital Converter Driver Guide
+=========================================================
 Overview
 ********
 This driver provides comprehensive support for the MAX31856 thermocouple-to-digital converter with advanced 
@@ -16,9 +16,11 @@ Key Features
 - Trigger Support: Data ready and fault triggers for interrupt-driven operation
 - Configurable Operation: One-shot and auto-conversion modes
 - Noise Filtering: 50Hz/60Hz noise rejection options
+
 Device Tree Configuration
-************************
+**************************
 1. **Basic Configuration**
+
 .. code-block:: DTS
 
    &spi0 {
@@ -37,6 +39,7 @@ Device Tree Configuration
    };
 
 2. **Advanced Configuration with External Sensor**
+
 .. code-block:: DTS
 
    &i2c0 {
@@ -71,6 +74,7 @@ Device Tree Configuration
 
 3. **Kconfig Options**
 Enable driver features through Kconfig:
+
 .. code-block:: Kconfig
 
    # Enable MAX31856 driver
@@ -88,7 +92,9 @@ Enable driver features through Kconfig:
 API Usage
 *********
 1. **Basic Temperature Reading**
+
 .. code-block:: C
+
    #include <zephyr/drivers/sensor.h>
    #include "max31856.h"
 
@@ -115,7 +121,9 @@ API Usage
    }
 
 2. **Setting Attributes**
-.. code-block:: C   
+
+.. code-block:: C
+
    /* Set Thermocouple thresholds */
    struct sensor_value fault_th = { .val1 = 100, .val2 = 0 }; // 100°C
    sensor_attr_set(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_TC_UPPER_THRESH, &fault_th);
@@ -128,7 +136,9 @@ API Usage
    sensor_attr_set(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_AVERAGING, &avg);
 
 3. **Trigger Handling**
-.. code-block:: C   
+
+.. code-block:: C 
+  
    #ifdef CONFIG_MAX31856_FAULT_TRIGGER
    /* Fault trigger handler */
    static void fault_trigger_handler(const struct device *dev,
