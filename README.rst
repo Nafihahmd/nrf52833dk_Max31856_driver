@@ -1,24 +1,20 @@
-.. zephyr:code-sample:: blinky
-   :name: Blinky
-   :relevant-api: gpio_interface
-
-   Blink an LED forever using the GPIO API.
-
+# MAX31856 Thermocouple-to-Digital Converter Driver Guide
 Overview
 ********
+This driver provides comprehensive support for the MAX31856 thermocouple-to-digital converter with advanced 
+features including external cold junction compensation, fault detection, and trigger-based operation. 
+The driver integrates with Zephyr's sensor subsystem and supports 
+both internal and external temperature sensing.
 
-The Blinky sample blinks an LED forever using the :ref:`GPIO API <gpio_api>`.
-
-The source code shows how to:
-
-#. Get a pin specification from the :ref:`devicetree <dt-guide>` as a
-   :c:struct:`gpio_dt_spec`
-#. Configure the GPIO pin as an output
-#. Toggle the pin forever
-
-See :zephyr:code-sample:`pwm-blinky` for a similar sample that uses the PWM API instead.
-
-.. _blinky-sample-requirements:
+Key Features
+************
+- Multiple Thermocouple Types: Support for B, E, J, K, N, R, S, T thermocouples
+- Dual Temperature Reading: Thermocouple and cold junction temperatures
+- External Cold Junction Compensation: Integration with external temperature sensors (e.g., SHT4x)
+- Advanced Fault Detection: Open circuit, ~overvoltage/undervoltage~, threshold, and range faults
+- Trigger Support: Data ready and fault triggers for interrupt-driven operation
+- Configurable Operation: One-shot and auto-conversion modes
+- Noise Filtering: 50Hz/60Hz noise rejection options
 
 Requirements
 ************
