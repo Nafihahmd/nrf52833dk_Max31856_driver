@@ -8,6 +8,7 @@
 #include <zephyr/sys/__assert.h>
 #include <zephyr/drivers/spi.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/types.h>
 #include <zephyr/device.h>
@@ -31,6 +32,9 @@ struct max31856_config {
 #ifdef CONFIG_MAX31856_DRDY_TRIGGER
     struct gpio_dt_spec drdy_gpio;
 #endif
+#ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
+    const struct device *sht4x_dev;
+#endif
 };
 
 struct max31856_data {
@@ -49,6 +53,9 @@ struct max31856_data {
     struct k_work drdy_work;
     const struct sensor_trigger *drdy_trigger;
     sensor_trigger_handler_t drdy_handler;
+#endif
+#ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
+    struct sensor_value cj_temp;
 #endif
 };
 
@@ -272,7 +279,7 @@ static int max31856_init_trigger(const struct device *dev)
 #endif /* CONFIG_MAX31856_DRDY_TRIGGER */
     /* Initialize fault GPIO */
 #ifdef CONFIG_MAX31856_FAULT_TRIGGER
-    if (config->fault_gpio.port /*&& config->fault_mask*/) {
+    if (config->fault_gpio.port && config->fault_mask) {
         if (!gpio_is_ready_dt(&config->fault_gpio)) {
             LOG_ERR("Fault GPIO device is not ready");
             return -ENODEV;
@@ -299,6 +306,31 @@ static int max31856_init_trigger(const struct device *dev)
     return 0;
 }
 #endif /* CONFIG_MAX31856_FAULT_TRIGGER */
+#ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
+static int max31856_update_cj_temp(const struct device *dev)
+{
+    const struct max31856_config *config = dev->config;
+    struct max31856_data *data = dev->data;
+    int ret;
+    
+    /* Read temperature from SHT4x */
+    ret = sensor_sample_fetch(config->sht4x_dev);
+    if (ret) {
+        LOG_ERR("Failed to fetch SHT4x sample: %d", ret);
+        return ret;
+    }
+    
+    ret = sensor_channel_get(config->sht4x_dev, SENSOR_CHAN_AMBIENT_TEMP, &data->cj_temp);
+    if (ret) {
+        LOG_ERR("Failed to get SHT4x temperature: %d", ret);
+        return ret;
+    }
+    LOG_INF("Cold junction temperature: %d.%06d C", data->cj_temp.val1, data->cj_temp.val2);
+    
+    /* Update MAX31856 cold junction registers */
+    return sensor_attr_set(dev, SENSOR_CHAN_ALL, MAX31856_ATTR_CJ_TEMP, &data->cj_temp);
+}
+#endif
 static int max31856_init(const struct device *dev)
 {
     const struct max31856_config *config = dev->config;
@@ -309,7 +341,16 @@ static int max31856_init(const struct device *dev)
         LOG_ERR("SPI bus is not ready");
         return -ENODEV;
     }
-
+    #ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
+    if (config->use_external_cj) {
+        LOG_INF("Phandle to SHT4x device: %p", config->sht4x_dev);
+        if (config->sht4x_dev == NULL || !device_is_ready(config->sht4x_dev)) {
+            LOG_ERR("SHT4x device not ready");
+            return -ENODEV;
+        }
+        LOG_INF("External SHT4x cold junction sensor enabled");
+    }
+#endif
     /* Read current CR0 */
     ret = max31856_read_reg(dev, MAX31856_CR0_REG, &cr0);
     if (ret) {
@@ -360,7 +401,7 @@ static int max31856_init(const struct device *dev)
 
     /* Config Fault Mask Regitser */
     if (config->fault_mask) {
-        uint8_t mask = 0x00;
+        uint8_t mask = 0x02;    // Mask OVUV fault because of false triggering
         ret = max31856_write_reg(dev, MAX31856_MASK_REG, mask);
         if (ret) {
             LOG_ERR("Failed to write MASK register");
@@ -386,7 +427,17 @@ static int max31856_sample_fetch(const struct device *dev,
     const struct max31856_config *config = dev->config;
     uint8_t buf[3];
     int ret;
-    
+
+    /* Update cold junction temperature if using external sensor */
+#ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
+    if (config->use_external_cj) {
+        ret = max31856_update_cj_temp(dev);
+        if (ret) {
+            LOG_ERR("Failed to update cold junction temperature: %d", ret);
+            return ret;
+        }
+    }
+#endif    
     // LOG_INF("Fetching sample from MAX31856\n");
     if (config->operating_mode == MAX31856_MODE_1SHOT) {
         /* Trigger conversion */
@@ -801,6 +852,12 @@ static const struct sensor_driver_api max31856_api = {
 #else
 #define MAX31856_DRDY_GPIO_INIT(n)
 #endif
+#ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
+#define MAX31856_EXTERNAL_CJ_SHT4X_INIT(n) \
+    .sht4x_dev =  DEVICE_DT_GET(DT_INST_PHANDLE(n, cold_junction)),
+#else
+#define MAX31856_EXTERNAL_CJ_SHT4X_INIT(n)
+#endif
 
 #define MAX31856_INIT(n) \
     static struct max31856_data max31856_data_##n; \
@@ -815,6 +872,7 @@ static const struct sensor_driver_api max31856_api = {
         .use_external_cj = DT_INST_PROP(n, use_external_cj), \
         .operating_mode = DT_INST_PROP(n, operating_mode), \
         .fault_mask = DT_INST_PROP(n, fault_mask), \
+         MAX31856_EXTERNAL_CJ_SHT4X_INIT(n) \
     }; \
     SENSOR_DEVICE_DT_INST_DEFINE(n, \
                   max31856_init, \

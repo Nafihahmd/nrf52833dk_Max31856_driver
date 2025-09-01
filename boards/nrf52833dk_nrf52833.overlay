@@ -17,7 +17,29 @@
         fault-gpios = < &gpio1 1 GPIO_ACTIVE_LOW >;  /* Fault GPIO */
         drdy-gpios = < &gpio1 2 GPIO_ACTIVE_LOW >;   /* Data Ready GPIO */
         filter-50hz;
-        operating-mode = <1>; /* 0 = Auto mode, 1 = 1 shot mode */
+        operating-mode = <0>; /* 0 = Auto mode, 1 = 1 shot mode */
         fault-mask; /* Enable FAULT pin assertion */        
+        // cold-junction = <&sht4x>; /* Use SHT4x for cold junction compensation */
+        // use-external-cj; /* Enable use of external cold junction sensor */
     };
+};
+&arduino_i2c {
+    status = "disabled";
+};
+&spi1 {
+    status = "disabled";
+};
+&i2c1 {
+	compatible = "nordic,nrf-twi";
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;	
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-1 = <&i2c1_sleep>;
+	pinctrl-names = "default", "sleep";
+	sht4x: sht4x@44 {
+		status = "okay";
+		compatible = "sensirion,sht4x";
+		reg = <0x44>;
+		repeatability = <2>;
+	};
 };

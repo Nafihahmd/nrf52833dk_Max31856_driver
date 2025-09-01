@@ -58,3 +58,11 @@ properties:
     description: |
       Fault GPIO specification. This pin goes active when a fault
       condition is detected. Typically active low.
+
+  cold-junction:
+    type: phandle
+    required: false
+    description: |
+      Cold junction sensor device. This sensor must provide temperature
+      readings in degrees Celsius. If not provided, the internal cold
+      junction sensor of the MAX31856 is used.

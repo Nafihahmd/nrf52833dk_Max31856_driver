@@ -11,11 +11,23 @@ menuconfig CUSTOM_MAX31856
       Enable support for the custom MAX31856 driver.
 config MAX31856_FAULT_TRIGGER
     bool "Enable fault trigger support for MAX31856"
-    depends on CUSTOM_MAX31855
+    depends on CUSTOM_MAX31856
     help
       Enable fault trigger support for MAX31856 data ready and fault detection.
 config MAX31856_DRDY_TRIGGER
     bool "Enable data ready trigger support for MAX31856"
-    depends on CUSTOM_MAX31855
+    depends on CUSTOM_MAX31856
     help
       Enable data ready trigger support for MAX31856.
+config MAX31856_USE_EXTERNAL_CJ
+    bool "Enable external cold junction sensor"
+    depends on CUSTOM_MAX31856
+    help
+      Use an external temperature sensor for cold junction compensation.
+
+config MAX31856_EXTERNAL_CJ_SHT4X
+    bool "Use SHT4x as external cold junction sensor"
+    depends on MAX31856_USE_EXTERNAL_CJ && SHT4X
+    default y
+    help
+      Use SHT4x temperature sensor for cold junction compensation.
