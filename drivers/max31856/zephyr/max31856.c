@@ -325,7 +325,7 @@ static int max31856_update_cj_temp(const struct device *dev)
         LOG_ERR("Failed to get SHT4x temperature: %d", ret);
         return ret;
     }
-    LOG_INF("Cold junction temperature: %d.%06d C", data->cj_temp.val1, data->cj_temp.val2);
+    // LOG_INF("Cold junction temperature: %d.%06d C", data->cj_temp.val1, data->cj_temp.val2);
     
     /* Update MAX31856 cold junction registers */
     return sensor_attr_set(dev, SENSOR_CHAN_ALL, MAX31856_ATTR_CJ_TEMP, &data->cj_temp);
@@ -343,12 +343,12 @@ static int max31856_init(const struct device *dev)
     }
     #ifdef CONFIG_MAX31856_EXTERNAL_CJ_SHT4X
     if (config->use_external_cj) {
-        LOG_INF("Phandle to SHT4x device: %p", config->sht4x_dev);
+        // LOG_INF("Phandle to SHT4x device: %p", config->sht4x_dev);
         if (config->sht4x_dev == NULL || !device_is_ready(config->sht4x_dev)) {
             LOG_ERR("SHT4x device not ready");
             return -ENODEV;
         }
-        LOG_INF("External SHT4x cold junction sensor enabled");
+        // LOG_INF("External SHT4x cold junction sensor enabled");
     }
 #endif
     /* Read current CR0 */
@@ -669,6 +669,59 @@ static int max31856_attr_set(const struct device *dev,
     int8_t offset_value;
     
     switch ((int)attr) {
+    case MAX31856_ATTR_FILTER_FREQ:
+        /* Set filter frequency (50Hz or 60Hz) */
+        {
+            uint8_t cr0;
+            ret = max31856_read_reg(dev, MAX31856_CR0_REG, &cr0);
+            if (ret) return ret;
+            
+            if (val->val1 == 50) {
+                cr0 |= MAX31856_CR0_FILTER_50HZ;
+            } else if (val->val1 == 60) {
+                cr0 &= ~MAX31856_CR0_FILTER_50HZ;
+            } else {
+                return -EINVAL; /* Invalid frequency */
+            }
+            
+            ret = max31856_write_reg(dev, MAX31856_CR0_REG, cr0);
+        }
+        break;
+    case MAX31856_ATTR_AVERAGING:
+        /* Set averaging (0-3) */
+        {
+            uint8_t cr1;
+            ret = max31856_read_reg(dev, MAX31856_CR1_REG, &cr1);
+            if (ret) return ret;
+            
+            if (val->val1 < 0 || val->val1 > 3) {
+                return -EINVAL; /* Invalid averaging */
+            }
+            
+            cr1 &= ~MAX31856_AVERAGING_MASK;
+            cr1 |= (val->val1 << MAX31856_AVERAGING_SHIFT);
+            
+            ret = max31856_write_reg(dev, MAX31856_CR1_REG, cr1);
+        }
+        break;
+    case MAX31856_ATTR_THERMOCOUPLE_TYPE:
+        /* Set thermocouple type */
+        {
+            uint8_t cr1;
+            ret = max31856_read_reg(dev, MAX31856_CR1_REG, &cr1);
+            if (ret) return ret;
+            
+            if (val->val1 < 0 || val->val1 > 8) {
+                return -EINVAL; /* Invalid thermocouple type */
+            }
+            
+            cr1 &= ~MAX31856_TC_TYPE_MASK;
+            cr1 |= (val->val1 & MAX31856_TC_TYPE_MASK);
+            
+            ret = max31856_write_reg(dev, MAX31856_CR1_REG, cr1);
+        }
+        break;
+     
     case MAX31856_ATTR_CJ_LOWER_THRESH:
         /* Convert to register units (0.015625°C per LSB) */
         microtemp = (int64_t)val->val1 * 1000000 + val->val2;
@@ -758,6 +811,37 @@ static int max31856_attr_get(const struct device *dev,
     uint8_t reg_value;
     
     switch ((int)attr) {
+    case MAX31856_ATTR_FILTER_FREQ:
+        {
+            uint8_t cr0;
+            ret = max31856_read_reg(dev, MAX31856_CR0_REG, &cr0);
+            if (ret) return ret;
+            
+            val->val1 = (cr0 & MAX31856_CR0_FILTER_50HZ) ? 50 : 60;
+            val->val2 = 0;
+        }
+        break;
+
+    case MAX31856_ATTR_AVERAGING:
+        {
+            uint8_t cr1;
+            ret = max31856_read_reg(dev, MAX31856_CR1_REG, &cr1);
+            if (ret) return ret;
+            val->val1 = (cr1 & MAX31856_AVERAGING_MASK) >> MAX31856_AVERAGING_SHIFT;
+            val->val2 = 0;
+        }
+        break;
+
+    case MAX31856_ATTR_THERMOCOUPLE_TYPE:
+        {
+            uint8_t cr1;
+            ret = max31856_read_reg(dev, MAX31856_CR1_REG, &cr1);
+            if (ret) return ret;
+            val->val1 = cr1 & MAX31856_TC_TYPE_MASK;
+            val->val2 = 0;
+        }
+        break; 
+    
     case MAX31856_ATTR_CJ_LOWER_THRESH:
         ret = max31856_read_threshold(dev, MAX31856_CJLF_REG, &cj_value);
         if (ret == 0) {

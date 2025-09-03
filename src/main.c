@@ -87,6 +87,8 @@ int main(void)
     struct sensor_value external_cj_val;
     /* Sensor threshold value */
     struct sensor_value threshold;
+    /* Sensor Status */
+    struct sensor_value status;
     if (!device_is_ready(max_dev)) {
         LOG_ERR("MAX31855 device not ready");
         return -1;
@@ -122,6 +124,15 @@ int main(void)
     threshold.val1 = 30; // Set threshold to 100 degrees Celsius
     threshold.val2 = 0;   // No fractional part
     sensor_attr_set(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_TC_UPPER_THRESH, &threshold);
+
+    /* Get sensor status */
+    sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_FILTER_FREQ, &status);
+    LOG_INF("MAX31856 filter frequency setting: %d\n", status.val1);
+    sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_AVERAGING, &status);
+    LOG_INF("MAX31856 averaging setting: %d\n", status.val1);
+    sensor_attr_get(max_dev, SENSOR_CHAN_ALL, MAX31856_ATTR_THERMOCOUPLE_TYPE, &status);
+    LOG_INF("MAX31856 thermocouple type setting: %d\n", status.val1);
+    
 	while (1) {
 		
         /* ask driver to read from the hardware and store latest sample */
