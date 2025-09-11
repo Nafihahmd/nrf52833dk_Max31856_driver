@@ -1,0 +1,156 @@
+
+/ {
+        aliases {
+                die-temp0 = &temp;
+        };
+};
+
+&gpio1 { status = "okay"; }; /* ensure gpio controller is enabled */
+// &uart20 { status = "disabled"; };
+&i2c20 { status = "disabled"; };
+// &spi00 { status = "disabled"; };
+
+/* Highspeed SPI (not working) */
+&spi00 {
+    status = "okay"; /* Only needed if you want to enable it, and it's not enabled elsewhere */
+	cs-gpios = < &gpio2 10 GPIO_ACTIVE_LOW >;
+    pinctrl-0 = <&spi00_default>;
+	pinctrl-1 = <&spi00_sleep>;
+    pinctrl-names = "default", "sleep";
+    max31856: max31856@0 {
+        compatible = "custom,max31856";
+        reg = <0>;
+        spi-max-frequency = <2000000>; /* Max 2MHz for nRF54L15 */
+        thermocouple-type = <3>; /* Type K */
+        averaging = <3>; /* 8 samples */
+        // fault-gpios = < &gpio1 14 GPIO_ACTIVE_LOW >;  /* Fault GPIO */
+        // drdy-gpios = < &gpio1 12 GPIO_ACTIVE_LOW >;   /* Data Ready GPIO */
+        filter-50hz;
+        operating-mode = <0>; /* 0 = Auto mode, 1 = 1 shot mode */
+        fault-mask; /* Enable FAULT pin assertion */        
+        // cold-junction = <&sht4x>; /* Use SHT4x for cold junction compensation */
+        // use-external-cj; /* Enable use of external cold junction sensor */
+    };
+};
+
+&pinctrl {
+    /omit-if-no-ref/ spi00_default: spi00_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 2, 6)>,
+                <NRF_PSEL(SPIM_MOSI, 2, 9)>,
+                <NRF_PSEL(SPIM_MISO, 2, 8)>;
+                nordic,drive-mode = <NRF_DRIVE_H0S1>; /* Extra high drive */
+        };
+    };
+
+    /omit-if-no-ref/ spi00_sleep: spi00_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 2, 6)>,
+                <NRF_PSEL(SPIM_MOSI, 2, 9)>,
+                <NRF_PSEL(SPIM_MISO, 2, 8)>;
+            low-power-enable;
+        };
+    };
+};
+
+/* Peripheral SPI */
+// &spi21 {
+//     status = "okay"; /* Only needed if you want to enable it, and it's not enabled elsewhere */
+// 	cs-gpios = < &gpio1 13 GPIO_ACTIVE_LOW >;
+//     pinctrl-0 = <&spi21_default>;
+// 	pinctrl-1 = <&spi21_sleep>;
+//     pinctrl-names = "default", "sleep";
+//     max31856: max31856@0 {
+//         compatible = "custom,max31856";
+//         reg = <0>;
+//         spi-max-frequency = <1000000>; /* Max 2MHz for nRF54L15 */
+//         thermocouple-type = <3>; /* Type K */
+//         averaging = <3>; /* 8 samples */
+//         fault-gpios = < &gpio1 14 GPIO_ACTIVE_LOW >;  /* Fault GPIO */
+//         drdy-gpios = < &gpio1 12 GPIO_ACTIVE_LOW >;   /* Data Ready GPIO */
+//         filter-50hz;
+//         operating-mode = <0>; /* 0 = Auto mode, 1 = 1 shot mode */
+//         fault-mask; /* Enable FAULT pin assertion */        
+//         // cold-junction = <&sht4x>; /* Use SHT4x for cold junction compensation */
+//         // use-external-cj; /* Enable use of external cold junction sensor */
+//     };
+// };
+
+// &pinctrl {
+//     /omit-if-no-ref/ spi21_default: spi21_default {
+//         group1 {
+//             psels = <NRF_PSEL(SPIM_SCK, 1, 8)>,
+//                 <NRF_PSEL(SPIM_MOSI, 1, 10)>,
+//                 <NRF_PSEL(SPIM_MISO, 1, 11)>;
+//         };
+//     };
+
+//     /omit-if-no-ref/ spi21_sleep: spi21_sleep {
+//         group1 {
+//             psels = <NRF_PSEL(SPIM_SCK, 1, 8)>,
+//                 <NRF_PSEL(SPIM_MOSI, 1, 10)>,
+//                 <NRF_PSEL(SPIM_MISO, 1, 11)>;
+//             low-power-enable;
+//         };
+//     };
+// };
+
+/* Low Power SPI */
+// &uart30 { status = "disabled"; };
+// &uart00 { status = "disabled"; };
+// &spi30 {
+//     status = "okay"; /* Only needed if you want to enable it, and it's not enabled elsewhere */
+// 	cs-gpios = < &gpio0 1 GPIO_ACTIVE_LOW >;
+//     pinctrl-0 = <&spi30_default>;
+// 	pinctrl-1 = <&spi30_sleep>;
+//     pinctrl-names = "default", "sleep";
+//     max31856: max31856@0 {
+//         compatible = "custom,max31856";
+//         reg = <0>;
+//         spi-max-frequency = <2000000>; /* Max 2MHz for nRF54L15 */
+//         thermocouple-type = <3>; /* Type K */
+//         averaging = <3>; /* 8 samples */
+//         fault-gpios = < &gpio0 4 GPIO_ACTIVE_LOW >;  /* Fault GPIO */
+//         // drdy-gpios = < &gpio1 12 GPIO_ACTIVE_LOW >;   /* Data Ready GPIO */
+//         filter-50hz;
+//         operating-mode = <0>; /* 0 = Auto mode, 1 = 1 shot mode */
+//         fault-mask; /* Enable FAULT pin assertion */        
+//         // cold-junction = <&sht4x>; /* Use SHT4x for cold junction compensation */
+//         // use-external-cj; /* Enable use of external cold junction sensor */
+//     };
+// };
+
+// &pinctrl {
+//     /omit-if-no-ref/ spi30_default: spi30_default {
+//         group1 {
+//             psels = <NRF_PSEL(SPIM_SCK, 0, 3)>,
+//                 <NRF_PSEL(SPIM_MOSI, 0, 2)>,
+//                 <NRF_PSEL(SPIM_MISO, 0, 0)>;
+//         };
+//     };
+
+//     /omit-if-no-ref/ spi30_sleep: spi30_sleep {
+//         group1 {
+//             psels = <NRF_PSEL(SPIM_SCK, 0, 3)>,
+//                 <NRF_PSEL(SPIM_MOSI, 0, 2)>,
+//                 <NRF_PSEL(SPIM_MISO, 0, 0)>;
+//             low-power-enable;
+//         };
+//     };
+// };
+
+
+// &i2c21 {
+// 	compatible = "nordic,nrf-twi";
+// 	status = "okay";
+// 	clock-frequency = <I2C_BITRATE_FAST>;	
+// 	pinctrl-0 = <&i2c21_default>;
+// 	pinctrl-1 = <&i2c21_sleep>;
+// 	pinctrl-names = "default", "sleep";
+// 	sht4x: sht4x@44 {
+// 		status = "okay";
+// 		compatible = "sensirion,sht4x";
+// 		reg = <0x44>;
+// 		repeatability = <2>;
+// 	};
+// };

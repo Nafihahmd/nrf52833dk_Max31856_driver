@@ -22,7 +22,9 @@ LOG_MODULE_REGISTER(max31856_app, LOG_LEVEL_INF);
 /* assumes you named the DT node: max31855: in your overlay (node-label = max31855;) */
 #define MAX31855_NODE DT_NODELABEL(max31856)
 static const struct device *max_dev = DEVICE_DT_GET(MAX31855_NODE);
+#ifdef CONFIG_SHT4X
 static const struct device *external_cj = DEVICE_DT_GET(DT_NODELABEL(sht4x));
+#endif
 
 #ifdef CONFIG_MAX31856_FAULT_TRIGGER
 /* Fault trigger handler */
